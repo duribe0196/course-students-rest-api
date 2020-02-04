@@ -62,12 +62,12 @@ const assignStudentToCourse = async (req, res) => {
     const { code } = req.query;
     const { name } = req.body;
 
-    const course = await courseModel.findOne(req.body);
-
     if (!code || !name)
       return res.send(
         'You need student code and course name to assing student to a course'
       );
+
+    const course = await courseModel.findOne(req.body);
 
     updatedResponse = await studentModel.findOneAndUpdate(req.query, {
       $push: { courses: course }
@@ -78,6 +78,18 @@ const assignStudentToCourse = async (req, res) => {
 };
 
 const getStudentsByCourse = async (req, res) => {
+  const { name } = req.query;
+  if (!name)
+    return res.send(
+      'You need thecourse name to get the student list in this course'
+    );
+
+  let studentsByCourse = await studentModel.find().populate('courses');
+  console.log(studentsByCourse);
+
+  let data = studentsByCourse.course.filter(student => student.name);
+  console.log(data);
+  res.send(data);
   try {
   } catch (error) {
     res.status(500).json(error);
