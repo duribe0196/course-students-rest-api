@@ -3,10 +3,12 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const app = express();
-const morgan = require('morgan');
-const { PORT } = process.env;
+const { PORT, NODE_ENV } = process.env;
 
-app.use(morgan('dev'));
+if (NODE_ENV === 'dev') {
+  const morgan = require('morgan');
+  app.use(morgan('dev'));
+}
 app.use(express.json());
 
 const src = './src';
