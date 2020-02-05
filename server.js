@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const app = express();
 const morgan = require('morgan');
-const { port } = process.env;
+const { PORT } = process.env;
 
 app.use(morgan('dev'));
 app.use(express.json());
@@ -21,6 +21,6 @@ try {
   console.log('Error loading the modules', error);
 }
 
-app.listen(port, () => {
-  console.log(`Server on port ${port}`);
+app.listen(PORT, () => {
+  console.log(`Server on port ${PORT}`);
 });
