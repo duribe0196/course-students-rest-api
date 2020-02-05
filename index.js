@@ -1,6 +1,6 @@
 require('dotenv').config();
 
-const requiredEnv = ['port', 'mongodbstring'];
+const requiredEnv = ['PORT', 'MONGODBSTRING'];
 
 for (let envVar of requiredEnv)
   if (!process.env[envVar])
