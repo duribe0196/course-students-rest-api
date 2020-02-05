@@ -1,5 +1,4 @@
-const path = require('path');
-const fs = require('fs');
+const moment = require('moment');
 const courseModel = require('./courses.model');
 
 const createCourse = async (req, res) => {
@@ -17,8 +16,30 @@ const createCourse = async (req, res) => {
 
 const getCourse = async (req, res) => {
   try {
-    const coursesFinded = await courseModel.find(req.query);
-    res.json(coursesFinded);
+    const courses = await courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'courses',
+          as: 'students'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: 1,
+          schedule: 1,
+          startDate: 1,
+          endDate: 1,
+          numberOfStudents: { $size: '$students' }
+        }
+      },
+      {
+        $sort: { numberOfStudents: -1 }
+      }
+    ]);
+    res.json(courses);
   } catch (error) {
     res.status(500).json(error);
   }
@@ -52,9 +73,132 @@ const deleteCourse = async (req, res) => {
   }
 };
 
+const getCoursesWithMoreStudents = async (req, res) => {
+  try {
+    const now = moment().toDate();
+    const sixMonthsAgo = moment()
+      .subtract(6, 'months')
+      .toDate();
+
+    const courseWithMoreStudents = await courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'courses',
+          as: 'students'
+        }
+      },
+      {
+        $match: {
+          createdAt: {
+            $gte: sixMonthsAgo,
+            $lt: now
+          }
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          schedule: 1,
+          _id: 0,
+          'students.code': 1,
+          'students.firstName': 1,
+          'students.lastName': 1,
+          containsStudents: { $gt: [{ $size: '$students' }, 0] },
+          numberOfStudents: { $size: '$students' }
+        }
+      },
+      {
+        $match: {
+          containsStudents: true
+        }
+      },
+      {
+        $sort: { numberOfStudents: -1 }
+      },
+      { $limit: 3 }
+    ]);
+
+    res.send(courseWithMoreStudents);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const getCoursesWithStudents = async (req, res) => {
+  try {
+    let coursesWithStudents = await courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'courses',
+          as: 'students'
+        }
+      },
+      {
+        $project: {
+          name: 1,
+          _id: 0,
+          schedule: 1,
+          'students.code': 1,
+          'students.firstName': 1,
+          'students.lastName': 1,
+          containsStudents: { $gt: [{ $size: '$students' }, 0] },
+          numberOfStudents: { $size: '$students' }
+        }
+      },
+      {
+        $match: {
+          containsStudents: true
+        }
+      }
+    ]);
+    res.send(coursesWithStudents);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const getCoursesWithoutStudents = async (req, res) => {
+  try {
+    const coursesWithoutStudents = await courseModel.aggregate([
+      {
+        $lookup: {
+          from: 'students',
+          localField: '_id',
+          foreignField: 'courses',
+          as: 'students'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          name: 1,
+          schedule: 1,
+          containsStudents: { $gt: [{ $size: '$students' }, 0] }
+        }
+      },
+      {
+        $match: {
+          containsStudents: false
+        }
+      }
+    ]);
+
+    res.json(coursesWithoutStudents);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
 module.exports = {
   createCourse,
   getCourse,
   updateCourse,
-  deleteCourse
+  deleteCourse,
+  getCoursesWithStudents,
+  getCoursesWithoutStudents,
+  getCoursesWithMoreStudents
 };

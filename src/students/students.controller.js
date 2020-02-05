@@ -1,5 +1,3 @@
-const path = require('path');
-const fs = require('fs');
 const studentModel = require('./students.model');
 const courseModel = require('../courses/courses.model');
 
@@ -20,8 +18,28 @@ const createStudent = async (req, res) => {
 
 const getStudent = async (req, res) => {
   try {
-    const studenFinded = await studentModel.find(req.query);
-    res.json(studenFinded);
+    let students = await studentModel.aggregate([
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'courses',
+          foreignField: '_id',
+          as: 'courses'
+        }
+      },
+      {
+        $project: {
+          code: 1,
+          firstName: 1,
+          lastName: 1,
+          'courses.name': 1,
+          'courses.schedule': 1,
+          _id: 0
+        }
+      }
+    ]);
+
+    res.json(students);
   } catch (error) {
     res.status(500).json(error);
   }
@@ -68,10 +86,19 @@ const assignStudentToCourse = async (req, res) => {
       );
 
     const course = await courseModel.findOne(req.body);
+    const studentData = await studentModel.find({
+      code: code,
+      courses: course._id
+    });
+    if (studentData.length)
+      return res.send(
+        `The student with code ${code} already is in ${name} course`
+      );
 
     updatedResponse = await studentModel.findOneAndUpdate(req.query, {
-      $push: { courses: course }
+      $push: { courses: course._id }
     });
+
     if (updatedResponse.n < 1) return res.send('Any course asigned');
     res.send(`${code} was assigned to course ${name}`);
   } catch (error) {}
@@ -81,16 +108,93 @@ const getStudentsByCourse = async (req, res) => {
   const { name } = req.query;
   if (!name)
     return res.send(
-      'You need thecourse name to get the student list in this course'
+      'You need the course name to get the student list in this course'
     );
 
-  let studentsByCourse = await studentModel.find().populate('courses');
-  console.log(studentsByCourse);
-
-  let data = studentsByCourse.course.filter(student => student.name);
-  console.log(data);
-  res.send(data);
+  let studentsByCourse = await studentModel.aggregate([
+    {
+      $lookup: {
+        from: 'courses',
+        localField: 'courses',
+        foreignField: '_id',
+        as: 'courses'
+      }
+    },
+    {
+      $match: { 'courses.name': name }
+    },
+    {
+      $project: { _id: 0, code: 1, firstName: 1, lastName: 1 }
+    }
+  ]);
+  res.send(studentsByCourse);
   try {
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const getStudentsWithouthCourses = async (req, res) => {
+  try {
+    let studentsWithouthCourse = await studentModel.aggregate([
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'courses',
+          foreignField: '_id',
+          as: 'courses'
+        }
+      },
+      {
+        $project: {
+          _id: 0,
+          code: 1,
+          firstName: 1,
+          lastName: 1,
+          containsCourses: { $gt: [{ $size: '$courses' }, 0] }
+        }
+      },
+      {
+        $match: {
+          containsCourses: false
+        }
+      }
+    ]);
+    res.json(studentsWithouthCourse);
+  } catch (error) {
+    res.status(500).json(error);
+  }
+};
+
+const getStudentsWithCourses = async (req, res) => {
+  try {
+    let studentsWithCourses = await studentModel.aggregate([
+      {
+        $lookup: {
+          from: 'courses',
+          localField: 'courses',
+          foreignField: '_id',
+          as: 'courses'
+        }
+      },
+      {
+        $project: {
+          code: 1,
+          firstName: 1,
+          lastName: 1,
+          'courses.name': 1,
+          'courses.schedule': 1,
+          _id: 0,
+          containsCourses: { $gt: [{ $size: '$courses' }, 0] }
+        }
+      },
+      {
+        $match: {
+          containsCourses: true
+        }
+      }
+    ]);
+    res.json(studentsWithCourses);
   } catch (error) {
     res.status(500).json(error);
   }
@@ -102,5 +206,7 @@ module.exports = {
   updateStudent,
   deleteStudent,
   getStudentsByCourse,
-  assignStudentToCourse
+  assignStudentToCourse,
+  getStudentsWithCourses,
+  getStudentsWithouthCourses
 };
